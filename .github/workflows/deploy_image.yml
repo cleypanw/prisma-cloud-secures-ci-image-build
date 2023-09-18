@@ -1,0 +1,85 @@
+### GitHub Action Worflow to Build, Scan by Prisma Cloud and Push To ECR Registry a Container Image
+### 
+### Usage: deploy this workflow in the GitHub repository containing your Dockerfile, update the variables and secret in your GitHub repository settings (Prisma Access/Secret Key, AWS Secret, etc.).
+###
+### Author: Christopher LEY - cley@paloaltonetwork.com
+
+name: Deploy to ECR
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ main ]
+
+jobs:
+
+  build-and-scan:
+    name: Build and scan image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v2
+
+      ### Control Github Name to remove no allowed chars. Github Name + Github Commit will be used as image_name and tag
+      - name: Prerequisite - Github name control to convert to the AWS ECR REPOSITORY name expected format (underscore and uppercase removed)
+        id: github_name_control
+        run: |
+          ./github_name_control.sh ${{ github.repository }} >> ECR_REPOSITORY
+          cat ECR_REPOSITORY
+          echo "ECR_REPOSITORY=$(cat ECR_REPOSITORY)" >> $GITHUB_ENV
+          echo ${{ env.ECR_REPOSITORY }}
+          echo ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        working-directory: ./scripts
+        shell: bash
+
+      - name: Build the image
+        env:
+          IMAGE_NAME: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: docker build -t $IMAGE_NAME .
+
+      ### Prisma Cloud vulnerabilities and compliance control (Hard fail is set into Prisma Cloud Console)
+      - name: Prisma Cloud image scan
+        id: scan
+        uses: PaloAltoNetworks/prisma-cloud-scan@v1.5
+        env:
+          IMAGE_NAME: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        with:
+          pcc_console_url: ${{ secrets.PCC_CONSOLE_URL }}
+          pcc_user: ${{ secrets.PCC_USER }}
+          pcc_pass: ${{ secrets.PCC_PASS }}
+          image_name: ${{ env.IMAGE_NAME }}
+
+      ### (Optional) for compatibility with GitHub's code scanning alerts
+      - name: Upload SARIF file
+        if: ${{ always() }} # necessary if using failure thresholds in the image scan
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif_file }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-3
+
+      - name: Login to Amazon ECR Registry
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      ### Create ECR Repository accordingly to Github Name
+      - name: Create AWS ECR repository
+        uses: int128/create-ecr-repository-action@v1
+        with:
+          repository: ${{ env.ECR_REPOSITORY }}
+
+      ### Build, Tag and Push Image to ECR
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_NAME: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME .
+          docker push $ECR_REGISTRY/$IMAGE_NAME
