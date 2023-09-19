@@ -21,7 +21,7 @@ The image is tested and validated by Prisma Cloud, to check for vulnerabilities 
 ##### 1. Create a fork of the repository
 
 - Login with your github account
-- Open https://github.com/cleypanw/docker_nodejs_demo and click on Fork
+- Open https://github.com/cleypanw/prisma-cloud-secures-ci-image-build and click on Fork
 
 
 
