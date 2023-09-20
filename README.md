@@ -1,6 +1,8 @@
 # Build, scan and deploy a docker image securely with Prisma Cloud and GitHub Action.
 
+#### Build Status
 
+[![Deploy to image repository](https://github.com/cleypanw/prisma-cloud-secures-ci-image-build/actions/workflows/deploy_image.yml/badge.svg?branch=main)](https://github.com/cleypanw/prisma-cloud-secures-ci-image-build/actions/workflows/deploy_image.yml)
 
 #### Objectifs
 
