@@ -1,4 +1,4 @@
-# Build, scan and deploy a docker image securely with Prisma Cloud and GitHub Action.
+# Build, scan & deploy a docker image securely with Prisma Cloud and GitHub Action.
 
 #### Build Status
 
